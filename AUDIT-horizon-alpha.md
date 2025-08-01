@@ -1,3 +1,5 @@
+> Audit performed by an anonymous model `openrouter/horizon-alpha` on OpenRouter.ai
+
 Below is a critical design review and elaboration on Project BitVPN’s concept, with emphasis on realism against modern traffic analysis, operational pitfalls, and protocol-consistency details you’ll need to solve for if the goal is “indistinguishable from BitTorrent.”
 
 Assumptions acknowledged
