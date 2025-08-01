@@ -2,9 +2,10 @@
 
 BitVPN vs BitSmuggler – Same disguise, different universes
 
-0. 10-second summary  
-   BitSmuggler = “Let’s ferry **Tor traffic** through an unmodified BitTorrent _swarm_ the same way Tor ferries TCP.”  
-   BitVPN = “Let’s build **a fresh VPN** whose **entire appearance** is a single BitTorrent file transfer.”
+- 0-second summary
+
+  - BitSmuggler = “Let’s ferry **Tor traffic** through an unmodified BitTorrent _swarm_ the same way Tor ferries TCP.”
+  - BitVPN = “Let’s build **a fresh VPN** whose **entire appearance** is a single BitTorrent file transfer.”
 
 Everything else is consequence.
 
