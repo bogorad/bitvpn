@@ -10,7 +10,7 @@ You posit BitTorrent traffic is both ubiquitous and politically impossible to bl
 
 - Public infrastructure gives resilience and some deniability. No static rendezvous or centralized bootstrap is attractive.
 
-Risks to address:
+### Risks to address:
 
 - Re-identification by behavior: A cluster of IPs consistently appearing as DHT peers for a particular info_hash pattern (rotating daily but always “hot” at midnight UTC) may be profileable over time. Randomize announce/join windows and churn, and distribute publication behavior across nodes and time-of-day.
 - InfoHash derivation collisions: SHA-1 with date concatenation is fine for deterministic rendezvous but consider adding per-realm namespace (e.g., H(date || salt || “bt-dht-pub”)) to avoid accidental overlap with real swarms. Already done, but ensure the string domain separation is explicit and stable.
