@@ -1,4 +1,4 @@
-> Audit performed by `moonshotai/kimi-k2` on OpenRouter.ai
+> Audit performed by `moonshotai/kimi-k2` on [OpenRouter.ai](https://openrouter.ai/moonshotai/kimi-k2)
 
 # Deep-Dive Discussion on BitVPN Design Choices & Reasoning
 
