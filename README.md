@@ -1,125 +1,109 @@
-### I. The Core Concept: A High-Stealth Tunneling System
+# Project BitVPN: A High-Stealth Obfuscated Tunneling System
 
-The fundamental goal is to create a secure, private internet tunnel for a small, trusted group of users. Its primary design objective is not speed, but **stealth**. It is engineered to be virtually undetectable by Deep Packet Inspection (DPI) engines and other network surveillance tools that are designed to identify and block standard VPN protocols.
+## Overview
 
-To achieve this, the system uses the ubiquitous **BitTorrent protocol as camouflage**. It does **not** use the public BitTorrent network to transfer data or improve speed. It merely mimics the behavior of a standard BitTorrent client at every stage, making its traffic blend in with the noise of global file-sharing activity.
+Project BitVPN is a personal, high-stealth VPN alternative designed to evade sophisticated network surveillance and Deep Packet Inspection (DPI). It achieves this by meticulously camouflaging its traffic to be indistinguishable from mundane BitTorrent activity.
 
----
+This system is not a tool for using the BitTorrent network. Instead, it leverages the BitTorrent protocol as a disguise, creating a secure, resilient, and difficult-to-block tunnel for a small, trusted group of users. The architecture supports multiple exit nodes, providing high availability and performance optimization through intelligent, latency-based node selection.
 
-### II. The Cast of Characters: System Roles
+## Core Concepts
 
-1.  **The Client Application:** Custom software run by each user on their device. It handles the entire process of finding the server, establishing the secret tunnel, and routing application traffic (e.g., from a web browser) through it.
+- **BitTorrent Camouflage:** The entire lifecycle of a connection, from server discovery to data transfer, is wrapped in legitimate-looking BitTorrent protocol messages.
+- **Dynamic Discovery via DHT:** Instead of relying on static IP addresses, clients find the exit nodes by querying the public BitTorrent DHT for a secret, daily-rotating identifier.
+- **Multi-Node Resilience & Performance:** The system is designed to run with multiple exit nodes distributed globally. Clients automatically select the fastest (lowest latency) node and perform instant failover if a node becomes unreachable.
+- **Layered Security:** A multi-pronged defense combining strong cryptographic authentication, behavioral mimicry, protocol obfuscation, and payload protection.
 
-2.  **The Exit Node Server:** A server you control (typically a Linux VPS) located in a jurisdiction of your choice. It runs the server-side software, which listens for connections, validates clients, and forwards their traffic to the public internet.
+## System Architecture
 
-3.  **The Public BitTorrent DHT:** The massive, decentralized "phonebook" used by real BitTorrent clients. We leverage this public infrastructure as a resilient and untraceable mechanism for clients to learn the Exit Node's IP address.
+The system consists of three main components:
 
----
+1.  **The Client Application:** A smart client run by each user. It handles discovery, latency testing, node selection, failover, and all the protocol camouflage logic. It exposes a simple SOCKS5 proxy for user applications.
+2.  **The Exit Node Servers:** A fleet of servers you control, distributed in different geographic locations. Each server runs the BitVPN software, listening for authorized clients and forwarding their traffic to the public internet.
+3.  **The Public BitTorrent DHT:** The global, decentralized BitTorrent "phonebook." We use this public infrastructure as a secure and robust way for clients to discover the IP addresses of the active Exit Nodes.
 
-### III. The Cryptographic Foundation: Keys and Secrets
+## The Cryptographic Foundation
 
-The system's security is built on a foundation of five distinct cryptographic elements. You, the administrator, are responsible for generating and securely distributing the initial secrets.
+The system's security is built on five distinct cryptographic elements.
 
-#### A. Asymmetric Keypairs (For Authentication)
+1.  **Asymmetric Keypairs (For Authentication):** A standard public/private keypair (e.g., ECDSA) is generated for **each Exit Node** and **each user**. This ensures that only authorized clients can connect, and they will only connect to legitimate, trusted servers.
 
-- **What:** A standard public/private keypair (e.g., ECDSA) is generated for the Exit Node and for each individual user.
-- **Purpose:** **Authentication.** This proves identity. When a client connects, it uses its private key to sign a challenge, which the server verifies with the client's public key. This ensures that only authorized individuals can access the system.
+2.  **The Permanent Secret Salt (The Master Secret):** A single, long, random string of text generated once by the administrator. This **permanent, static** secret is the root from which all daily dynamic secrets are derived.
 
-#### B. The Permanent Secret Salt (The Master Secret)
+3.  **The Daily `info_hash` (The Dynamic Public Meeting Point):** A 20-byte code that changes every day, used to find the Exit Nodes on the DHT. It is calculated by all parties using the formula: `info_hash = SHA1(Permanent_Secret_Salt + Current_UTC_Date_String)`. This provides **location forward secrecy**.
 
-- **What:** A single, long, high-entropy string of text (e.g., `a7d9...f4e2`). It is generated **once** and distributed securely to all users **once**.
-- **Purpose:** This is the **permanent, static** root secret. It is never transmitted and never changes. It acts as the source material from which the system's daily dynamic secrets are derived.
+4.  **The Daily Obfuscation Key (The Dynamic Internal Secret):** A key used to encrypt the tunnel handshake itself, also changing daily. It is derived independently to ensure it's different from the `info_hash`: `obfuscation_key = SHA1(Permanent_Secret_Salt + Current_UTC_Date_String + "bitvpn_v1")`.
 
-#### C. The Daily `info_hash` (The Dynamic Public Meeting Point)
+5.  **The Tunneling Protocol (XTLS):** The secure tunnel is built using XTLS (based on TLS 1.3). This protocol is chosen for its speed (leveraging CPU hardware acceleration for AES), modern security features, and battle-tested robustness as the core of HTTPS.
 
-- **What:** A 20-byte code that is used to find the Exit Node on the public DHT. It **changes every day**.
-- **Purpose:** **Discovery.** Both the client and server calculate this code independently using a standard formula:
-  `info_hash = SHA1(Permanent_Secret_Salt + Current_UTC_Date_String)`
-- The Exit Node announces itself to the DHT under this `info_hash`. Clients query the DHT for it. Because the `info_hash` is ephemeral and derived from a secret salt, it provides **location forward secrecy**.
+## Flow of a Connection: A Step-by-Step Journey
 
-#### D. The Daily Obfuscation Key (The Dynamic Internal Secret)
+This is the lifecycle of a connection, layering all stealth and resilience strategies.
 
-- **What:** A secret key used to encrypt the tunnel handshake itself. It also **changes every day**.
-- **Purpose:** **Payload Protection.** To prevent DPI from recognizing the structure of the XTLS handshake, we encrypt it before wrapping it in a BitTorrent message. This key is derived independently:
-  `obfuscation_key = SHA1(Permanent_Secret_Salt + Current_UTC_Date_String + "tunnel_key_v1")`
-- This key is never transmitted; it's calculated by both sides to hide the handshake.
-
-#### E. The Tunneling Protocol: XTLS (based on TLS 1.3)
-
-- **What:** The actual secure tunnel that carries the user's internet traffic is built using XTLS, a modern, high-performance variant of TLS 1.3.
-- **Purpose:** **Performance and Security.** This protocol is chosen for three key reasons:
-  1.  **Speed:** It is extremely fast, as **modern CPUs include hardware acceleration** (e.g., AES-NI) for its underlying cryptographic operations, making encryption and decryption highly efficient.
-  2.  **Modern Security:** It uses the latest, most secure cryptographic ciphers and has a faster, more secure handshake process than older protocols.
-  3.  **Battle-Tested:** It is the same core technology that secures the vast majority of the modern web (HTTPS), meaning it is robust, well-understood, and heavily scrutinized.
-
----
-
-### IV. The Complete Flow: A Step-by-Step Journey
-
-This is the lifecycle of a connection, layering all our stealth strategies.
-
-#### Phase 1: Dynamic Discovery
+#### Phase 1: Discovery & Node Selection
 
 1.  A user starts the Client Application.
 2.  The client calculates **today's `info_hash`** using the Permanent Salt and the current UTC date.
-3.  It connects to the public BitTorrent DHT and asks for peers associated with that `info_hash`.
-4.  The DHT network returns the IP address of your Exit Node.
-5.  To handle the midnight UTC handover, if the client finds no peer, it automatically calculates **yesterday's `info_hash`** and queries again. The Exit Node announces on both hashes around midnight to ensure a smooth transition.
+3.  It queries the public BitTorrent DHT for peers associated with that `info_hash`. The DHT returns a **list of IP addresses** for all active Exit Nodes.
+4.  **The client now performs a quick latency test** on every IP in the list to determine the round-trip time.
+5.  It sorts the nodes from lowest latency (fastest) to highest latency (slowest).
 
-#### Phase 2: The Cover Story (Behavioral Mimicry)
+#### Phase 2: Connection & The Cover Story
 
-1.  The client connects to the Exit Node's IP and performs a **perfectly standard BitTorrent handshake**.
-2.  To establish a benign context, they engage in a **"bait data" exchange**.
-    - The client sends an `interested` message; the server replies with `unchoke`.
-    - The client requests a few pieces of a pre-shared, innocuous "bait file."
-    - The server responds with the correct `piece` messages containing the bait data.
-3.  **Result:** Any DPI engine has now classified this flow as a **legitimate BitTorrent file transfer**, defeating behavioral analysis.
+1.  The client attempts to connect to the **fastest available node** from its sorted list.
+2.  Upon successful TCP connection, it performs a **perfectly standard BitTorrent handshake**.
+3.  To establish a benign context, it engages in a **"bait data" exchange**, requesting and receiving a few real `piece` messages from a pre-shared bait file.
+4.  **Failover:** If the connection to the fastest node fails at any point in this phase, the client automatically discards that node and repeats the process with the next-fastest node on its list.
 
-#### Phase 3: The Secret Handshake (Tunnel Negotiation)
+#### Phase 3: The Secret Handshake
 
-1.  With its cover established, the client begins the real handshake, disguised within the common **`ut_metadata` protocol**.
+1.  With its cover story established, the client begins the real handshake, disguised within the common **`ut_metadata` protocol**.
 2.  It calculates **today's `obfuscation_key`**.
-3.  It takes its XTLS `ClientHello` message and **encrypts it** with the `obfuscation_key`.
-4.  It **wraps** this encrypted payload inside a `ut_metadata` message and sends it.
-5.  The Exit Node receives the message, extracts the payload, decrypts it with the same `obfuscation_key`, and processes the `ClientHello`. It follows the identical encrypt-then-wrap process for its `ServerHello` response.
-6.  After this exchange, a secure XTLS tunnel is established. This process defeats both **protocol anomaly detection** and **payload fingerprinting**.
+3.  It takes its XTLS `ClientHello` message, **encrypts it** with the `obfuscation_key`, and **wraps** it inside a `ut_metadata` message to send.
+4.  The Exit Node follows the identical encrypt-then-wrap process for its responses.
+5.  A secure XTLS tunnel is established, having defeated behavioral, protocol, and payload analysis.
 
-#### Phase 4: The Secure Tunnel (Data Transfer)
+#### Phase 4: The Secure Tunnel
 
 1.  The XTLS tunnel is now active.
-2.  All application traffic (e.g., an HTTPS request) is encrypted by the XTLS tunnel.
-3.  The client wraps these encrypted XTLS packets inside standard BitTorrent **`piece` messages** and sends them to the Exit Node.
-4.  The Exit Node unwraps the `piece` messages, decrypts the data via the XTLS tunnel, and forwards it to the public internet. This process looks like a normal, long-lived file transfer.
+2.  All application traffic is encrypted by the tunnel and wrapped inside standard BitTorrent **`piece` messages** for transfer, appearing as a normal file-sharing session.
 
----
+## Deployment Guide
 
-### V. Deployment Strategy
+#### Administrator Setup (The "Genesis" Event)
 
-1.  **The "Genesis" Event:** As the administrator, you generate the Permanent Salt and all keypairs. You then securely distribute the following to each user:
+1.  **Generate Secrets:**
+    - Generate the single **Permanent Secret Salt**.
+    - Generate a unique keypair for **each Exit Node server**.
+    - Generate a unique keypair for **each user**.
+2.  **Deploy Servers:**
+    - Set up multiple Linux VPS instances in your desired locations.
+    - On each server, install the Exit Node software.
+    - Create a configuration file on each server containing its unique **private key** and the shared **Permanent Salt**.
+    - Run the software as a service. It will automatically start announcing itself to the DHT.
+3.  **Distribute Client Credentials:**
+    - Securely transmit the necessary credentials to each user. This includes:
+      - Their unique **private key**.
+      - The **Permanent Secret Salt**.
+      - A **list of all trusted Exit Node public keys**.
 
-    - Their unique private key.
-    - The Exit Node's public key.
-    - The shared Permanent Secret Salt.
+#### Client Setup
 
-2.  **The Exit Node Setup:** On a Linux VPS, you install the Exit Node software and a configuration file containing its private key and the Permanent Salt. You run the software as a service.
+1.  The user receives the Client Application executable.
+2.  They create a configuration file containing their private key, the Permanent Salt, and the list of trusted server public keys.
+3.  They run the application.
 
-3.  **The Client Setup:** Your friends install the Client Application and a configuration file containing their secrets.
+## User Experience
 
----
+The Client Application is designed to be simple to use.
 
-### VI. Client Requirements & User Experience
+1.  The user runs the client.
+2.  The client automatically handles discovery, latency testing, and connection.
+3.  It creates a local **SOCKS5 proxy** on the user's machine (e.g., at `127.0.0.1:1080`).
+4.  The user configures their web browser (or other application) to use this local proxy for all network traffic. All traffic from that application is now securely and transparently routed through the BitVPN network.
 
-- **Software:** The user only needs the custom client application and their configuration file.
-- **User Action:** The user runs the client. It does not act as a system-wide VPN. Instead, it creates a local **SOCKS5 proxy** (e.g., on `127.0.0.1:1080`).
-- **The Experience:** The user must configure their web browser's network settings to use this local proxy. All traffic from the browser will then be automatically and transparently routed through the stealth tunnel, while other applications on their system use the internet normally.
+## Security & Limitations
 
----
-
-### VII. Security & Limitations
-
-- **Strengths:** Extremely high resistance to automated censorship and blocking. Resilient to server IP changes. Provides location forward secrecy.
-- **Weaknesses:**
-  - **Trust:** The administrator of the Exit Node has ultimate power and must be trusted completely.
-  - **Centralization:** The Exit Node is a single point of failure for traffic.
-  - **Not for Public Torrenting:** This system should not be used to download public torrents, as this would create traceable and risky network patterns.
-  - **Complexity:** This is a sophisticated, custom system, not a simple consumer application.
+- **Trust:** The administrator of the Exit Nodes has ultimate power and must be trusted completely.
+- **Attack Surface:** Using multiple servers increases the system's attack surface. It is critical to keep all nodes secure and patched.
+- **Not for Public Torrenting:** This system is a VPN alternative. It should not be used to download public torrents, as this would create traceable and risky network patterns.
+- **Complexity:** This is a sophisticated, custom system, not a simple one-click consumer application.
