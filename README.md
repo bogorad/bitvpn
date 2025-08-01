@@ -2,7 +2,7 @@
 
 The fundamental goal is to create a secure, private internet tunnel for a small, trusted group of users. Its primary design objective is not speed, but **stealth**. It is engineered to be virtually undetectable by Deep Packet Inspection (DPI) engines and other network surveillance tools that are designed to identify and block standard VPN protocols.
 
-To achieve this, the system uses the ubiquitous **BitTorrent protocol as camouflage**. It does **not** use the public BitTorrent network to transfer data or improve speed. It merely mimics the behavior of a standard BitTorrent client at every stage, from server discovery to data transfer, making its traffic blend in with the noise of global file-sharing activity.
+To achieve this, the system uses the ubiquitous **BitTorrent protocol as camouflage**. It does **not** use the public BitTorrent network to transfer data or improve speed. It merely mimics the behavior of a standard BitTorrent client at every stage, making its traffic blend in with the noise of global file-sharing activity.
 
 ---
 
@@ -18,7 +18,7 @@ To achieve this, the system uses the ubiquitous **BitTorrent protocol as camoufl
 
 ### III. The Cryptographic Foundation: Keys and Secrets
 
-The system's security is built on a foundation of four distinct cryptographic elements. You, the administrator, are responsible for generating and securely distributing the initial secrets.
+The system's security is built on a foundation of five distinct cryptographic elements. You, the administrator, are responsible for generating and securely distributing the initial secrets.
 
 #### A. Asymmetric Keypairs (For Authentication)
 
@@ -35,14 +35,22 @@ The system's security is built on a foundation of four distinct cryptographic el
 - **What:** A 20-byte code that is used to find the Exit Node on the public DHT. It **changes every day**.
 - **Purpose:** **Discovery.** Both the client and server calculate this code independently using a standard formula:
   `info_hash = SHA1(Permanent_Secret_Salt + Current_UTC_Date_String)`
-- The Exit Node announces itself to the DHT under this `info_hash`. Clients query the DHT for it. Because the `info_hash` is ephemeral and derived from a secret salt, it provides **location forward secrecy**: an adversary who compromises the salt in the future cannot discover which IP addresses the server used in the past.
+- The Exit Node announces itself to the DHT under this `info_hash`. Clients query the DHT for it. Because the `info_hash` is ephemeral and derived from a secret salt, it provides **location forward secrecy**.
 
 #### D. The Daily Obfuscation Key (The Dynamic Internal Secret)
 
 - **What:** A secret key used to encrypt the tunnel handshake itself. It also **changes every day**.
-- **Purpose:** **Payload Protection.** To prevent DPI from recognizing the structure of the XTLS handshake, we encrypt it before wrapping it in a BitTorrent message. This key is derived independently from the same source materials, ensuring it's different from the `info_hash`:
+- **Purpose:** **Payload Protection.** To prevent DPI from recognizing the structure of the XTLS handshake, we encrypt it before wrapping it in a BitTorrent message. This key is derived independently:
   `obfuscation_key = SHA1(Permanent_Secret_Salt + Current_UTC_Date_String + "tunnel_key_v1")`
-- This key is never transmitted; it's calculated by both sides and used to hide the handshake from prying eyes.
+- This key is never transmitted; it's calculated by both sides to hide the handshake.
+
+#### E. The Tunneling Protocol: XTLS (based on TLS 1.3)
+
+- **What:** The actual secure tunnel that carries the user's internet traffic is built using XTLS, a modern, high-performance variant of TLS 1.3.
+- **Purpose:** **Performance and Security.** This protocol is chosen for three key reasons:
+  1.  **Speed:** It is extremely fast, as **modern CPUs include hardware acceleration** (e.g., AES-NI) for its underlying cryptographic operations, making encryption and decryption highly efficient.
+  2.  **Modern Security:** It uses the latest, most secure cryptographic ciphers and has a faster, more secure handshake process than older protocols.
+  3.  **Battle-Tested:** It is the same core technology that secures the vast majority of the modern web (HTTPS), meaning it is robust, well-understood, and heavily scrutinized.
 
 ---
 
